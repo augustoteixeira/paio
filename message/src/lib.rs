@@ -7,8 +7,9 @@ use alloy_core::{
 };
 use alloy_signer::Signature;
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use derive_more::{Display, Into};
 use serde::{Deserialize, Serialize};
-
 pub struct WalletState {
     pub domain: Eip712Domain,
 
@@ -24,9 +25,7 @@ impl WalletState {
         batch
             .txs
             .iter()
-            .filter_map(|tx| {
-                self.verify_single(batch.sequencer_payment_address, tx)
-            })
+            .filter_map(|tx| self.verify_single(batch.sequencer_payment_address, tx))
             .collect()
     }
     // TODO: create custom error type in order to explain why it did not work
@@ -51,10 +50,7 @@ impl WalletState {
         tx_opt
     }
 
-    pub fn verify_raw_batch(
-        &mut self,
-        raw_batch: &[u8],
-    ) -> postcard::Result<Vec<Transaction>> {
+    pub fn verify_raw_batch(&mut self, raw_batch: &[u8]) -> postcard::Result<Vec<Transaction>> {
         let batch = Batch::from_bytes(raw_batch)?;
         Ok(self.verify_batch(batch))
     }
@@ -77,14 +73,17 @@ impl WalletState {
     }
 }
 
-impl WalletState {
-    pub fn new() -> Self {
+impl Default for WalletState {
+    fn default() -> Self {
         WalletState {
             domain: DOMAIN.clone(),
             app_nonces: HashMap::new(),
             balances: HashMap::new(),
         }
     }
+}
+
+impl WalletState {
     pub fn add_app_nonce(&mut self, address: Address, nonces: AppNonces) {
         self.app_nonces.insert(address, nonces);
     }
@@ -111,15 +110,13 @@ impl AppState {
             .collect()
     }
 
-    pub fn verify_raw_batch(
-        &mut self,
-        raw_batch: &[u8],
-    ) -> postcard::Result<Vec<Transaction>> {
+    pub fn verify_raw_batch(&mut self, raw_batch: &[u8]) -> postcard::Result<Vec<Transaction>> {
         let batch = Batch::from_bytes(raw_batch)?;
         Ok(self.verify_batch(batch))
     }
 }
 
+#[derive(Default)]
 pub struct AppNonces {
     // user address to nonce
     pub nonces: HashMap<Address, u64>,
@@ -142,26 +139,18 @@ impl AppNonces {
         tx: &WireTransaction,
         domain: &Eip712Domain,
     ) -> Option<Transaction> {
-        let Some(tx) = tx.verify(&domain) else {
-            return None;
-        };
-
+        tracing::info!("verifying tx under domain ..");
+        let tx = tx.verify(domain)?;
+        tracing::info!("verifying ok!");
         let expected_nonce = self.nonces.entry(tx.sender).or_insert(0);
 
         if *expected_nonce != tx.nonce {
+            tracing::error!("verify failed: expected nonce {:?} got {:?}", *expected_nonce, tx.nonce);
             return None;
         }
 
         *expected_nonce += 1;
         Some(tx)
-    }
-}
-
-impl Default for AppNonces {
-    fn default() -> Self {
-        Self {
-            nonces: HashMap::new(),
-        }
     }
 }
 
@@ -176,10 +165,7 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn cost(&self) -> Option<U256> {
-        U256::checked_mul(
-            U256::from(self.max_gas_price),
-            U256::from(self.data.len()),
-        )
+        U256::checked_mul(U256::from(self.max_gas_price), U256::from(self.data.len()))
     }
 }
 
@@ -288,6 +274,44 @@ impl BatchBuilder {
     }
 }
 
+#[derive(
+    Serialize,
+    Deserialize,
+    Ord,
+    Display,
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    CanonicalDeserialize,
+    CanonicalSerialize,
+    Default,
+    Clone,
+    Copy,
+    Into,
+)]
+#[display(fmt = "{_0}")]
+pub struct NamespaceId(u64);
+
+impl From<u64> for NamespaceId {
+    fn from(number: u64) -> Self {
+        Self(number)
+    }
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EspressoTransaction {
+    namespace: NamespaceId,
+    #[serde(with = "base64_bytes")]
+    payload: Vec<u8>,
+}
+
+impl EspressoTransaction {
+    pub fn new(namespace: NamespaceId, payload: Vec<u8>) -> Self {
+        Self { namespace, payload }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct SignedTransaction {
     pub message: SigningMessage,
@@ -299,27 +323,41 @@ impl SignedTransaction {
         self.recover(domain).is_ok()
     }
 
-    pub fn recover(
-        &self,
-        domain: &Eip712Domain,
-    ) -> Result<Address, SignatureError> {
-        let signing_hash = self.message.eip712_signing_hash(&domain);
+    pub fn recover(&self, domain: &Eip712Domain) -> Result<Address, SignatureError> {
+        let signing_hash = self.message.eip712_signing_hash(domain);
         self.signature.recover_address_from_prehash(&signing_hash)
+    }
+
+    pub fn to_wire_transaction(&self) -> WireTransaction {
+        WireTransaction {
+            app: self.message.app,
+            nonce: self.message.nonce,
+            max_gas_price: self.message.max_gas_price,
+            data: self.message.data.clone().into(),
+            signature: self.signature,
+        }
     }
 }
 
 pub const DOMAIN: Eip712Domain = eip712_domain!(
-   name: "CartesiPaio",
-   version: "0.0.1",
-   chain_id: 1337,
+   name: "Cartesi",
+   version: "0.1.0",
+   chain_id: 11155111,
    verifying_contract: Address::ZERO,
 );
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct SubmitPointTransaction {
+    pub message: String,
+    pub signature: String,
+}
 
 #[cfg(test)]
 mod tests {
     use alloy_core::sol_types::SolStruct;
     use alloy_signer::SignerSync;
-    use alloy_signer_wallet::LocalWallet;
+    // use alloy_signer_wallet::LocalWallet;
+    use alloy_signer_local::PrivateKeySigner as LocalWallet;
     use std::str::FromStr;
 
     use super::*;
@@ -350,7 +388,7 @@ mod tests {
 
         let signature = signer.sign_typed_data_sync(&v, &DOMAIN).unwrap();
         assert_eq!(
-            r#"{"r":"0xfa6f7fd6825c953b355c8970fd2c9322162987bfb6898aa78f74f2be6bf8b10c","s":"0x9a2018a7e31b623a91802147e6f8d5c658e17191e69f6663052efda71db72e2","yParity":"0x1"}"#,
+            r#"{"r":"0xb131cda9f34ca69a351d2a3b8809a9f0b5f4c99e3e0977d541456d800273cf9e","s":"0x61bb5be8e5a98611fee68ec707a0b4bb901ffc6ffd00c8250d9a7c037fc15680","yParity":"0x1"}"#,
             serde_json::to_string(&signature).unwrap()
         );
         let signed_tx = SignedTransaction {
@@ -361,7 +399,7 @@ mod tests {
         let ret = serde_json::to_string(&signed_tx).unwrap();
 
         assert_eq!(
-            r#"{"message":{"app":"0x0000000000000000000000000000000000000000","nonce":0,"max_gas_price":0,"data":"0x48656c6c6f2c20576f726c6421"},"signature":{"r":"0xfa6f7fd6825c953b355c8970fd2c9322162987bfb6898aa78f74f2be6bf8b10c","s":"0x9a2018a7e31b623a91802147e6f8d5c658e17191e69f6663052efda71db72e2","yParity":"0x1"}}"#,
+            r#"{"message":{"app":"0x0000000000000000000000000000000000000000","nonce":0,"max_gas_price":0,"data":"0x48656c6c6f2c20576f726c6421"},"signature":{"r":"0xb131cda9f34ca69a351d2a3b8809a9f0b5f4c99e3e0977d541456d800273cf9e","s":"0x61bb5be8e5a98611fee68ec707a0b4bb901ffc6ffd00c8250d9a7c037fc15680","yParity":"0x1"}}"#,
             ret
         );
 
@@ -383,7 +421,7 @@ mod tests {
         assert_eq!(signer, recovered);
 
         assert_eq!(
-            r#"{"name":"CartesiPaio","version":"0.0.1","chainId":"0x539","verifyingContract":"0x0000000000000000000000000000000000000000"}"#,
+            r#"{"name":"Cartesi","version":"0.1.0","chainId":"0xaa36a7","verifyingContract":"0x0000000000000000000000000000000000000000"}"#,
             serde_json::to_string(&DOMAIN).unwrap()
         );
     }
