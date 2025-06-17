@@ -11,13 +11,13 @@ Apparently one needs this:
 
 Install `foundry`, including `avail` and `cast`.
 
-Running
-=======
-
 For useful scripts, install `jaq`:
 
     cargo install --locked jaq
     cargo install tomlq
+
+Running
+=======
 
 Run anvil:
 

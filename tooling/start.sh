@@ -10,6 +10,7 @@ tmux new-session -d -s $session -n servers
 tmux selectp -t 0
 tmux set -g pane-border-status top
 tmux set -g pane-border-format "#{pane_index} #{pane_current_command}"
+tmux send-keys "echo Anvil pane" C-m
 tmux send-keys "source ~/.bashrc" C-m
 tmux send-keys "cd ../tripa" C-m
 tmux send-keys "anvil" C-m
@@ -19,16 +20,18 @@ sleep 1
 tmux splitw -v
 tmux set -g pane-border-status top
 tmux set -g pane-border-format "#{pane_index} #{pane_current_command}"
+tmux send-keys "echo Tripa pane" C-m
 tmux send-keys "source ~/.bashrc" C-m
 tmux send-keys "cd ../tripa" C-m
 tmux send-keys "./fund-sequencer.sh" C-m
 sleep 1
-tmux send-keys "cargo run" C-m
+tmux send-keys "cargo run --bin main --target x86_64-unknown-linux-gnu" C-m
 
 # Select pane for frontend
 tmux splitw -h
 tmux set -g pane-border-status top
 tmux set -g pane-border-format "#{pane_index} #{pane_current_command}"
+tmux send-keys "echo Frontend pane" C-m
 tmux send-keys "source ~/.bashrc" C-m
 tmux send-keys "cd ../example/frontend/second/vanilla-ts-6963" C-m
 tmux send-keys "npm run dev" C-m
@@ -38,6 +41,7 @@ tmux selectp -t 0
 tmux splitw -h
 tmux set -g pane-border-status top
 tmux set -g pane-border-format "#{pane_index} #{pane_current_command}"
+tmux send-keys "echo Terminal pane" C-m
 tmux send-keys "source ~/.bashrc" C-m
 
 # create a new window called <PROJECT NAME>
@@ -58,4 +62,3 @@ tmux send-keys "source ~/.bashrc" C-m
 
 # Finished setup, attach to the tmux session!
 tmux attach-session -t $session
-
