@@ -1,10 +1,8 @@
-#![feature(async_closure)]
 use alloy_core::primitives::Address;
 use hex;
 use message::{
-    AppNonces, Batch, BatchBuilder, SignedTransaction, WalletState, DOMAIN,
+    BatchBuilder, SignedTransaction
 };
-use serde_json::json;
 
 mod utils;
 

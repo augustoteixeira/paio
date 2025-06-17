@@ -14,9 +14,11 @@ pub async fn fund_sequencer(
         .to(sequencer_address)
         .value("30000000000000000000".parse().unwrap());
     // Send the transaction and wait for the broadcast.
-    let pending_tx = provider.send_transaction(tx).await.unwrap();
+    let pending_tx = provider.send_transaction(tx)
+        .await.expect("failed to send tranaction to fund sequencer");
     // Wait for the transaction to be included and get the receipt.
-    let _receipt = pending_tx.get_receipt().await.unwrap();
+    let _receipt = pending_tx.get_receipt()
+        .await.expect("failed to get transaction receipt");
 }
 
 // Codegen from ABI file to interact with the contract.

@@ -43,7 +43,6 @@ alloy-provider = { version = "0.3.6", features = ["reqwest"] }
 alloy-transport-http = { version = "0.3.6" }
 alloy-signer-local = { version = "0.3.6", features = ["eip712"] }
 futures-util = "0.3.30"
-tower-http = { version = "0.5.2", features = ["cors"] }
 hex = "0.4.3"
 avail-rust = { git = "https://github.com/availproject/avail", rev = "5dc73fb028eed1413a1f15ee22c8a9641b0d23a8" }
 surf-disco = "0.9"

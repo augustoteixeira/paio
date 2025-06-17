@@ -1,6 +1,5 @@
-#![feature(async_closure)]
 use hex;
-use message::{AppNonces, Batch, BatchBuilder, WalletState, DOMAIN};
+use message::{Batch};
 use serde_json::json;
 
 mod utils;

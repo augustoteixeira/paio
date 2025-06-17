@@ -1,41 +1,21 @@
-use alloy_core::{
-    primitives::{address, Address, Bytes, U256},
-    sol,
-    sol_types::Eip712Domain,
-};
-use alloy_network::EthereumSigner;
+//use alloy_network::EthereumSigner;
 use alloy_node_bindings::Anvil;
 use alloy_node_bindings::AnvilInstance;
 use alloy_provider::{Provider, ProviderBuilder};
-use alloy_signer::k256::ecdsa;
-use alloy_signer_wallet::LocalWallet;
-use alloy_signer_wallet::Wallet;
-use anyhow::Error;
 use std::{
-    fs,
     str::FromStr,
-    sync::Arc,
 };
 
 use anyhow::{Error, anyhow};
-use serde::{Deserialize, Serialize};
 use es_version::SequencerVersion;
 
-use tokio::{
-    task,
-    sync::Mutex,
-};
-
-
 use axum::{
-    extract::{Query, State},
+    extract::{State},
     http::StatusCode,
-    routing::{get, options, post},
+    routing::{get, post},
     Json, Router,
 };
 
-use message::WireTransaction;
-use message::{AppNonces, BatchBuilder, WalletState, DOMAIN};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -43,21 +23,15 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task;
 use toml;
-use tower_http::cors::CorsLayer;
-use utils::InputBox;
 
 mod utils;
-
+use utils::fund_sequencer;
 use alloy_core::{
     primitives::{address, Address, Bytes, U256},
     sol,
     sol_types::{Eip712Domain, SolType},
 };
 use alloy_network::EthereumWallet;
-use alloy_node_bindings::Anvil;
-use alloy_node_bindings::AnvilInstance;
-use alloy_provider::{Provider, ProviderBuilder};
-use alloy_rpc_types::TransactionRequest;
 use alloy_signer_local::PrivateKeySigner;
 
 use avail_rust::{avail, AvailExtrinsicParamsBuilder, Data, Keypair, SecretUri, WaitFor, SDK};
@@ -69,23 +43,6 @@ use message::{
     AppNonces, BatchBuilder, EspressoTransaction, SignedTransaction, SigningMessage,
     SubmitPointTransaction, WalletState, DOMAIN,
 };
-
-async fn fund_sequencer(
-    signer_address: Address,
-    sequencer_address: Address,
-    provider: Box<dyn Provider<alloy_transport_http::Http<reqwest::Client>>>,
-) {
-    let tx = TransactionRequest::default()
-        .from(signer_address)
-        .to(sequencer_address)
-        .value("30000000000000000000".parse().unwrap());
-    // Send the transaction and wait for the broadcast.
-    let pending_tx = provider.send_transaction(tx)
-        .await.expect("failed to send tranaction to fund sequencer");
-    // Wait for the transaction to be included and get the receipt.
-    let _receipt = pending_tx.get_receipt()
-        .await.expect("failed to get transaction receipt");
-}
 
 
 // TODO: unify this code. the current problem is that provider does not have a size
@@ -202,6 +159,8 @@ enum DALayer {
     Avail,
     Espresso,
 }
+
+const DEPLOY_INPUT_BOX: bool = true;
 
 #[derive(Deserialize)]
 struct Config {
@@ -436,6 +395,7 @@ async fn main() {
             .deploy()
             .await
             .unwrap()
+    }
 
     if config.da_layer == DALayer::EVM {
         fund_sequencer(
