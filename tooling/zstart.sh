@@ -1,8 +1,10 @@
 session="cartesipaio"
 
 # set up tmux
-tmux start-server
+zellij -s dashboard -n layout.kdl &
+zellij action write-chars "anvil\n"
 
+exit
 # create a new tmux session with <NAME>
 tmux new-session -d -s $session -n servers
 
@@ -41,10 +43,10 @@ tmux selectp -t 0
 tmux splitw -h
 tmux set -g pane-border-status top
 tmux set -g pane-border-format "#{pane_index} #{pane_current_command}"
-tmux send-keys "# Terminal pane" C-m
-tmux send-keys "# Help:" C-m
-tmux send-keys "#   ctrl-b <arrow>  to move to another pane" C-m
-tmux send-keys "#   tmux kill-ses   to stop every pane" C-m
+tmux send-keys "echo Terminal pane" C-m
+tmux send-keys "echo Help:" C-m
+tmux send-keys "echo   ctrl-b <arrow>  to move to another pane" C-m
+tmux send-keys "echo   tmux kill-ses   to stop every pane" C-m
 tmux send-keys "source ~/.bashrc" C-m
 
 # create a new window called <PROJECT NAME>
